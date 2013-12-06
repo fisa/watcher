@@ -16,8 +16,7 @@ This displays the help of watcher:
 
 Example to check a web page:
 
-	$ cd path/to/watcher/folder
-	$ ./watcher -u "http://en.wikipedia.org/wiki/Bash_(Unix_shell)"
+	$ ./watcher -u http://www.isacchi.eu/en/application/14/watcher
 
 
 ## Changelog:
