@@ -1,0 +1,132 @@
+#!/bin/bash
+
+# Checks continuously a web page for changes.
+#
+# Author: Federico Isacchi, http://www.isacchi.eu/
+# License: GPLv3, https://gnu.org/licenses/gpl.html
+# Version: 1.0
+
+version="1.0"
+
+maxtime=180		#see -m of curl
+waittime=300	#how many seconds wait between two checks
+
+a_h=0 #help
+a_v=0 #version
+a_q=0 #quiet
+a_s=0 #sound
+a_u=0 #url
+
+while getopts ":hw:qvsu:" opt
+do
+	case $opt in
+		h)
+			a_h=1
+			;;
+		w)
+			waittime=$OPTARG
+			;;
+		q)
+			a_q=1
+			;;
+		v)
+			a_v=1
+			;;
+		s)
+			a_s=1
+			;;
+		u)
+			a_u=1
+			url=$OPTARG
+			;;
+		\?)
+			echo "watcher: try 'watcher -h' for help"
+			exit 2
+			;;
+	esac
+done
+
+if [[ "$a_h" -eq 1 ]] ; then
+	echo "Usage: watcher [options] -u <url>"
+	echo "Checks continuously a web page for changes."
+	echo "Options:"
+	echo "  -h Output this help."
+	echo "  -q Quiet mode."
+	echo "  -s Plays a sound if the web page changed."
+	echo "  -u <url> Set the <url> to check."
+	echo "  -v Output the version of this script."
+	echo "  -w <seconds> Sets how many seconds to wait between two checks."
+	exit 0
+fi
+
+if [[ "$a_v" -eq 1 ]] ; then
+	echo "watcher v$version"
+	exit 0
+fi
+
+if [[ "$a_u" -eq 0 ]] ; then
+	echo "You must specify an url..."
+	echo "Try 'watcher -h' for help"
+	exit 0
+fi
+
+f1=$( mktemp -t watcher.XXXXXX )
+f2=$( mktemp -t watcher.XXXXXX )
+
+function rem_tmp {
+	rm $f1
+	rm $f2
+	exit 0
+}
+trap 'rem_tmp' INT
+
+if [[ $(curl -s -I -f "$url" -o /dev/null) -ne 0 ]] ; then
+	if [[ "$a_q" -eq 0 ]] ; then
+		echo "Failed to get \"$url\""
+	fi
+	exit 1
+fi
+
+if [[ "$a_q" -eq 0 ]] ; then
+	date
+	echo "Downloading the web page at \"$url\"..."
+	curl -m $maxtime -# $url -o $f1
+else
+	curl -s -m $maxtime -# $url -o $f1
+fi
+
+if [[ "$a_q" -eq 0 ]] ; then
+	echo "I wait a while..."
+fi
+sleep $waittime
+
+changed=0
+while [ $changed -eq 0 ]
+do
+	if [[ "$a_q" -eq 0 ]] ; then
+		date
+		echo "Checking..."
+		curl -m $maxtime -# $url -o $f2
+	else
+		curl -s -m $maxtime -# $url -o $f2
+	fi
+	cmp -s $f1 $f2
+	changed=$?
+	if [ $changed -eq 0 ]
+	then
+		if [[ "$a_q" -eq 0 ]] ; then
+			echo "No updates, I wait then I'll try again."
+		fi
+		sleep $waittime
+	fi
+done
+
+if [[ "$a_s" -eq 1 ]] ; then
+	echo -ne "\007\007\007\007"
+fi
+if [[ "$a_q" -eq 0 ]] ; then
+	echo "Web page updated!!"
+fi
+
+rem_tmp
+exit 0
